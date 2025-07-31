@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price History - Price Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Chart.js for price history graph -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Price History</h1>
+            <a href="{{ url_for('index') }}" class="back-button">← Back to Search</a>
+        </header>
+
+        <main>
+            <div class="product-details">
+                <div class="product-info">
+                    <h2>{{ product.name }}</h2>
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-image">
+                    <p class="current-price">Current Price: ${{ "%.2f"|format(product.current_price) }}</p>
+                    <p class="retailer">Retailer: {{ product.retailer }}</p>
+                    <a href="{{ product.url }}" target="_blank" class="view-button">View on Retailer Site</a>
+                </div>
+
+                <div class="price-chart">
+                    <div class="chart-header">
+                        <h3>Price History</h3>
+                        <div class="chart-controls">
+                            <select id="timeRange" class="chart-select">
+                                <option value="all">All Time</option>
+                                <option value="1m">Last Month</option>
+                                <option value="3m">Last 3 Months</option>
+                                <option value="6m">Last 6 Months</option>
+                                <option value="1y">Last Year</option>
+                            </select>
+                            <button id="exportData" class="export-btn">
+                                <span class="export-icon">📊</span> Export Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="chartLoading" class="loading-spinner">Loading...</div>
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="price-stats">
+                    <div class="stat-box" title="The highest recorded price for this product">
+                        <span class="stat-label">Highest Price</span>
+                        <span class="stat-value">${{ "%.2f"|format(price_stats.highest) }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Lowest Price</span>
+                        <span class="stat-value">${{ "%.2f"|format(price_stats.lowest) }}</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Average Price</span>
+                        <span class="stat-value">${{ "%.2f"|format(price_stats.average) }}</span>
+                    </div>
+                </div>
+
+                <div class="price-table">
+                    <h3>Price History Table</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Price</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in price_history %}
+                            <tr>
+                                <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                                <td>${{ "%.2f"|format(record.price) }}</td>
+                                <td class="{{ 'price-up' if record.change > 0 else 'price-down' if record.change < 0 else '' }}">
+                                    {% if record.change != 0 %}
+                                        {{ "+" if record.change > 0 else "" }}{{ "%.2f"|format(record.change) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        <!-- Price Alerts Modal -->
+        <div id="alertsModal" class="modal">
+            <div class="modal-content">
+                <h3>Set Price Alert</h3>
+                <p>Get notified when the price changes according to your preferences.</p>
+                <form id="alertForm">
+                    <div class="form-group">
+                        <label for="targetPrice">Target Price ($)</label>
+                        <input type="number" id="targetPrice" name="targetPrice" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="condition">Alert Condition</label>
+                        <select id="condition" name="condition" required>
+                            <option value="below">Price drops below target</option>
+                            <option value="above">Price goes above target</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn btn-primary">Set Alert</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeAlertsModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Product data with default values for safety
+        const productData = {
+            dates: {{ dates|default([])|tojson|safe }},
+            prices: {{ prices|default([])|tojson|safe }},
+            currentPrice: {{ product.current_price|default(0)|tojson|safe }},
+            name: {{ product.name|default('')|tojson|safe }},
+            id: {{ product.id|default('')|tojson|safe }}
+        };
+
+        // Loading indicator
+        const chartLoading = document.getElementById('chartLoading');
+
+        // Initialize chart with loading state
+        chartLoading.style.display = 'flex';
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        let priceChart = null;
+
+        function initChart(dates, prices) {
+            // Validate input data
+            if (!Array.isArray(dates) || !Array.isArray(prices) || dates.length !== prices.length) {
+                chartLoading.style.display = 'none';
+                console.error('Invalid data for chart');
+                return null;
+            }
+
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Price History',
+                        data: prices,
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '$' + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        onComplete: function() {
+                            chartLoading.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize chart with all data
+        try {
+            priceChart = initChart(productData.dates, productData.prices);
+            if (!priceChart) {
+                // Show error message if chart initialization failed
+                const chartContainer = document.querySelector('.chart-container');
+                chartContainer.innerHTML = '<div class="error-message">No price history data available</div>';
+            }
+        } catch (error) {
+            console.error('Error initializing chart:', error);
+            chartLoading.style.display = 'none';
+        }
+
+        // Time range filter
+        document.getElementById('timeRange').addEventListener('change', function(e) {
+            const range = e.target.value;
+            let filteredDates = [...productData.dates];
+            let filteredPrices = [...productData.prices];
+
+            if (range !== 'all') {
+                const now = new Date();
+                let monthsBack = 12;
+                
+                switch(range) {
+                    case '1m': monthsBack = 1; break;
+                    case '3m': monthsBack = 3; break;
+                    case '6m': monthsBack = 6; break;
+                    case '1y': monthsBack = 12; break;
+                }
+
+                const cutoffDate = new Date(now.setMonth(now.getMonth() - monthsBack));
+                const startIndex = filteredDates.findIndex(date => new Date(date) >= cutoffDate);
+                
+                if (startIndex !== -1) {
+                    filteredDates = filteredDates.slice(startIndex);
+                    filteredPrices = filteredPrices.slice(startIndex);
+                }
+            }
+
+            // Update chart with filtered data
+            priceChart.destroy();
+            chartLoading.style.display = 'flex';
+            priceChart = initChart(filteredDates, filteredPrices);
+        });
+
+        // Export functionality
+        document.getElementById('exportData').addEventListener('click', function() {
+            const csv = [
+                ['Date', 'Price'],
+                ...productData.dates.map((date, i) => [date, productData.prices[i]])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `price-history-${productData.name}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // Price alerts functionality
+        function openAlertsModal() {
+            document.getElementById('alertsModal').style.display = 'flex';
+            document.getElementById('targetPrice').value = productData.currentPrice;
+        }
+
+        function closeAlertsModal() {
+            document.getElementById('alertsModal').style.display = 'none';
+        }
+
+        document.getElementById('alertForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                productId: productData.id,
+                targetPrice: parseFloat(formData.get('targetPrice')),
+                condition: formData.get('condition'),
+                email: formData.get('email')
+            };
+
+            try {
+                const response = await fetch('/api/set-price-alert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('Price alert has been set successfully!');
+                    closeAlertsModal();
+                } else {
+                    throw new Error('Failed to set price alert');
+                }
+            } catch (error) {
+                alert('Error setting price alert: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>

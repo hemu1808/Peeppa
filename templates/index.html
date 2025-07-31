@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Tracker - Search Products</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <h1>Price Tracker</h1>
+            <p class="subtitle">Track prices across multiple retailers</p>
+        </header>
+
+        <main>
+            <div class="search-section">
+                <form action="{{ url_for('search') }}" method="POST" class="search-form">
+                    <div class="search-box">
+                        <input 
+                            type="text" 
+                            name="query" 
+                            placeholder="Enter product name or URL..." 
+                            required
+                            class="search-input"
+                            value="{{ query if query else '' }}"
+                        >
+                        <button type="submit" class="search-button">Search</button>
+                    </div>
+                    
+                    <div class="retailers">
+                        {% for retailer in retailers %}
+                        <label class="retailer-checkbox">
+                            <input 
+                                type="checkbox" 
+                                name="retailers" 
+                                value="{{ retailer.id }}"
+                                {% if retailer.checked %}checked{% endif %}
+                            >
+                            <span class="retailer-name">{{ retailer.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+
+            {% if recent_searches %}
+            <section class="recent-searches">
+                <h2>Recent Searches</h2>
+                <div class="search-history">
+                    {% for search in recent_searches %}
+                    <div class="history-item">
+                        <a href="{{ url_for('search', query=search.query) }}" class="history-link">
+                            <span class="search-query">{{ search.query }}</span>
+                            <span class="search-time">{{ search.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+
+            {% if tracked_products %}
+            <section class="tracked-products">
+                <h2>Currently Tracking</h2>
+                <div class="product-grid">
+                    {% for product in tracked_products %}
+                    <div class="product-card">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" class="product-thumbnail">
+                        <div class="product-info">
+                            <h3 class="product-name">{{ product.name }}</h3>
+                            <p class="product-price">${{ "%.2f"|format(product.current_price) }}</p>
+                            <p class="price-change {{ 'price-up' if product.price_change > 0 else 'price-down' if product.price_change < 0 else '' }}">
+                                {% if product.price_change != 0 %}
+                                    {{ "+" if product.price_change > 0 else "" }}{{ "%.2f"|format(product.price_change) }}
+                                {% else %}
+                                    No change
+                                {% endif %}
+                            </p>
+                            <div class="product-actions">
+                                <a href="{{ url_for('price_history', product_id=product.id) }}" class="view-history">View History</a>
+                                <a href="{{ product.url }}" target="_blank" class="visit-store">Visit Store</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+            {% endif %}
+        </main>
+
+        <footer class="main-footer">
+            <p>© 2025 Price Tracker. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>

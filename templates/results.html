@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Results - Price Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Search Results</h1>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="back-button">← New Search</a>
+            </div>
+        </header>
+
+        <main>
+            <div class="search-summary">
+                <p>Found {{ results|length }} results for "{{ query }}"</p>
+                <div class="search-filters">
+                    <select id="sortOrder" class="sort-select" onchange="updateSort(this.value)">
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="name_asc">Name: A to Z</option>
+                        <option value="name_desc">Name: Z to A</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if results %}
+            <div class="results-grid">
+                {% for product in results %}
+                <div class="product-card">
+                    <div class="product-image">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                        <div class="retailer-badge">{{ product.retailer }}</div>
+                    </div>
+                    
+                    <div class="product-details">
+                        <h2 class="product-name">{{ product.name }}</h2>
+                        <div class="price-info">
+                            <span class="current-price">${{ "%.2f"|format(product.price) }}</span>
+                            {% if product.original_price and product.original_price > product.price %}
+                            <span class="original-price">${{ "%.2f"|format(product.original_price) }}</span>
+                            <span class="discount-badge">
+                                -{{ ((1 - product.price / product.original_price) * 100)|round|int }}%
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if product.rating %}
+                        <div class="product-rating">
+                            <div class="stars" style="--rating: {{ product.rating }}"></div>
+                            <span class="rating-count">({{ product.review_count }})</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="product-actions">
+                            <button 
+                                onclick="trackProduct('{{ product.id }}')" 
+                                class="track-button {{ 'tracked' if product.is_tracked else '' }}"
+                            >
+                                {{ "✓ Tracking" if product.is_tracked else "Track Price" }}
+                            </button>
+                            <a href="{{ product.url }}" target="_blank" class="view-button">View on Site</a>
+                        </div>
+
+                        {% if product.is_tracked %}
+                        <div class="price-summary">
+                            <div class="price-stat">
+                                <span class="stat-label">Lowest</span>
+                                <span class="stat-value">${{ "%.2f"|format(product.lowest_price) }}</span>
+                            </div>
+                            <div class="price-stat">
+                                <span class="stat-label">Highest</span>
+                                <span class="stat-value">${{ "%.2f"|format(product.highest_price) }}</span>
+                            </div>
+                            <div class="price-stat">
+                                <span class="stat-label">Average</span>
+                                <span class="stat-value">${{ "%.2f"|format(product.average_price) }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="no-results">
+                <p>No products found matching your search criteria.</p>
+                <p>Try:</p>
+                <ul>
+                    <li>Using different keywords</li>
+                    <li>Checking for typos</li>
+                    <li>Using more general terms</li>
+                    <li>Selecting different retailers</li>
+                </ul>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        function updateSort(value) {
+            const url = new URL(window.location);
+            url.searchParams.set('sort', value);
+            window.location = url;
+        }
+
+        function trackProduct(productId) {
+            fetch('/track-product', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ product_id: productId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const button = document.querySelector(`button[onclick="trackProduct('${productId}')"]`);
+                    button.classList.add('tracked');
+                    button.textContent = '✓ Tracking';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

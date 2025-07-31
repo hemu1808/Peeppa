@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Tracker - Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .status-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        .status-value {
+            font-weight: bold;
+        }
+        .status-connected {
+            color: #28a745;
+        }
+        .status-disconnected {
+            color: #dc3545;
+        }
+        .demo-mode {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .retailer-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .retailer-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <h1>Price Tracker Status</h1>
+            <p class="subtitle">Application Status and Configuration</p>
+        </header>
+
+        <main class="status-container">
+            <div class="status-card">
+                <h2>System Status</h2>
+                <div class="status-item">
+                    <span>Database Connection:</span>
+                    <span class="status-value {% if 'Connected' in db_status %}status-connected{% else %}status-disconnected{% endif %}">
+                        {{ db_status }}
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span>Demo Mode:</span>
+                    <span class="status-value">{{ "Enabled" if demo_mode else "Disabled" }}</span>
+                </div>
+                <div class="status-item">
+                    <span>Last Updated:</span>
+                    <span class="status-value">{{ timestamp }}</span>
+                </div>
+            </div>
+
+            {% if demo_mode %}
+            <div class="demo-mode">
+                <h3>⚠️ Demo Mode Active</h3>
+                <p>Since real scraping is currently blocked by retailers, the application is running in demo mode. 
+                This provides sample data to demonstrate the application's functionality.</p>
+                <p><strong>Note:</strong> The demo products shown are for demonstration purposes only.</p>
+            </div>
+            {% endif %}
+
+            <div class="status-card">
+                <h2>Supported Retailers</h2>
+                <div class="retailer-list">
+                    {% for retailer in retailers %}
+                    <div class="retailer-item">
+                        {{ retailer }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h2>Quick Actions</h2>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="{{ url_for('index') }}" class="view-button">Go to Search</a>
+                    <a href="{{ url_for('health_check') }}" class="view-button">Health Check</a>
+                    <a href="https://github.com/your-repo/price-tracker" class="view-button" target="_blank">Documentation</a>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h2>API Endpoints</h2>
+                <div class="status-item">
+                    <span>Health Check:</span>
+                    <span class="status-value">GET /health</span>
+                </div>
+                <div class="status-item">
+                    <span>Search Products:</span>
+                    <span class="status-value">POST /search</span>
+                </div>
+                <div class="status-item">
+                    <span>Price History:</span>
+                    <span class="status-value">GET /price-history/&lt;id&gt;</span>
+                </div>
+                <div class="status-item">
+                    <span>Track Product:</span>
+                    <span class="status-value">POST /track-product</span>
+                </div>
+            </div>
+        </main>
+
+        <footer class="main-footer">
+            <p>© 2025 Price Tracker. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html> 
